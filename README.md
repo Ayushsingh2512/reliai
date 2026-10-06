@@ -128,7 +128,7 @@ reliai/
 | Phase | Title | Status |
 |---|---|---|
 | 0 | Architecture & Blueprint | ✅ Complete |
-| 1 | Repository & Dev Infrastructure | ⬜ Planned |
+| 1 | Repository & Dev Infrastructure | ✅ Complete |
 | 2 | Backend Foundation + PostgreSQL | ⬜ Planned |
 | 3 | Demo Microservices | ⬜ Planned |
 | 4 | Observability Pipeline | ⬜ Planned |
@@ -153,8 +153,36 @@ cd reliai
 docker compose up
 ```
 
+## Local Development (Phase 1)
+
+1. **Environment Setup**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Run with Docker Compose**
+   ```bash
+   make up
+   ```
+   This will start PostgreSQL, Redis, Backend (port 8001), and Frontend (port 5173).
+
+3. **Run Locally without Docker**
+   - **Backend**: 
+     ```bash
+     cd backend
+     pip install -e .[dev]
+     make dev-backend  # or uvicorn app.main:app --reload
+     ```
+   - **Frontend**:
+     ```bash
+     cd frontend
+     npm install
+     make dev-frontend # or npm run dev
+     ```
+
+
 Frontend will be available at `http://localhost:5173`
-Backend API at `http://localhost:8000`
+Backend API at `http://localhost:8001`
 Prometheus at `http://localhost:9090`
 
 ---

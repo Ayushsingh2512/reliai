@@ -1,0 +1,9 @@
+from fastapi import FastAPI
+
+from app.config import settings
+
+app = FastAPI(title="ReliAI API")
+
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    return {"status": "ok", "environment": settings.environment}

@@ -1,0 +1,8 @@
+project-includes = [
+    "backend",
+    "tests"
+]
+
+search-path = [
+    "backend"
+]
