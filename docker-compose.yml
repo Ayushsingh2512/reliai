@@ -38,6 +38,8 @@ services:
     volumes:
       - ./backend:/app
       - ./.env:/app/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://reliai:password@postgres:5432/reliai
     depends_on:
       postgres:
         condition: service_healthy

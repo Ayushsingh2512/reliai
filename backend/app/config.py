@@ -4,6 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     environment: str = "development"
     
+    # Database
+    database_url: str = "postgresql+asyncpg://reliai:password@localhost:5433/reliai"
+    
     # Timing variables from ADR-014
     detection_interval: int = 10
     prometheus_scrape_interval: str = "10s"
