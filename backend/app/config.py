@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://reliai:password@localhost:5433/reliai"
     
+    # Authentication
+    jwt_secret_key: str = "dev-secret-do-not-use-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
     # Timing variables from ADR-014
     detection_interval: int = 10
     prometheus_scrape_interval: str = "10s"
