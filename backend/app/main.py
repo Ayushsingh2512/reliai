@@ -2,10 +2,13 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routers import auth
 from app.config import settings
 from app.database import get_db
 
 app = FastAPI(title="ReliAI API")
+
+app.include_router(auth.router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
