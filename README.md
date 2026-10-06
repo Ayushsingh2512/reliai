@@ -3,7 +3,7 @@
 **ReliAI: An Intelligent Platform for Automated Incident Detection, Root Cause Analysis and Reliability Management**
 
 > B.Tech CSE Major Project · Full-Stack AI-Assisted SRE Platform · Locally Deployable via Docker Compose
-> Architecture v0.2 — All 14 ADRs accepted — Ready for Phase 1 implementation
+> Architecture v0.2 is approved — All 14 ADRs are accepted — Phase 0 and Phase 1 (Repository & Dev Infrastructure) are complete — Phase 2 has not started yet
 
 ---
 
@@ -84,7 +84,7 @@ AI-assisted reliability platform that:
 
 ---
 
-## Technology Stack
+## Target Technology Stack
 
 | Layer | Technology |
 |---|---|
@@ -96,7 +96,7 @@ AI-assisted reliability platform that:
 | Background Jobs | Celery 5 |
 | AI / LLM | `LLMProvider` abstraction: GeminiProvider, OpenAICompatibleProvider, MockProvider |
 | AI Output | Pydantic-validated structured JSON; evidence-grounded `RCAOutput` schema |
-| RCA Modes | `RCA_BASELINE` (deterministic 9-rule engine) + `RCA_AI` (LLM-assisted) |
+| RCA Modes | <ul><li>`RCA_BASELINE` — deterministic rule-based baseline</li><li>`RCA_AI` — controlled single-call evidence-grounded LLM RCA</li><li>`RCA_AI_NO_EVIDENCE` — evidence-grounding ablation</li><li>`RCA_AI_NO_GRAPH` — dependency-graph-context ablation</li><li>`RCA_AGENT` — experimental bounded tool-calling RCA variant (NOT a replacement for `RCA_AI`)</li></ul> |
 | Observability | OpenTelemetry, Prometheus, structured JSON logs |
 | Containerisation | Docker, Docker Compose |
 | Testing | Pytest, HTTPX, Vitest, Playwright (E2E) |
@@ -134,10 +134,10 @@ reliai/
 | 4 | Observability Pipeline | ⬜ Planned |
 | 5 | Incident Detection Engine | ⬜ Planned |
 | 6 | Incident Management API | ⬜ Planned |
-| 7 | AI RCA Pipeline (RCA_BASELINE + RCA_AI) | ⬜ Planned |
+| 7 | AI RCA Pipeline (All Modes) | ⬜ Planned |
 | 8 | React Dashboard | ⬜ Planned |
-| 9 | Dependency Graph + Analytics | ⬜ Planned |
-| 10 | Failure Injection + Evaluation (160 evaluations) | ⬜ Planned |
+| 9 | Topology Visualization & Graph Analytics | ⬜ Planned |
+| 10 | Failure Injection + Evaluation (280 evaluations) | ⬜ Planned |
 | 11 | Testing Suite | ⬜ Planned |
 | 12 | Docker / Deployment | ⬜ Planned |
 | 13 | Documentation & Demo Polish | ⬜ Planned |
@@ -183,7 +183,8 @@ docker compose up
 
 Frontend will be available at `http://localhost:5173`
 Backend API at `http://localhost:8001`
-Prometheus at `http://localhost:9090`
+
+*(Note: Prometheus and OpenTelemetry are not part of the current Phase 1 stack and will be introduced in the later Observability phase.)*
 
 ---
 
@@ -191,10 +192,10 @@ Prometheus at `http://localhost:9090`
 
 This project is submitted as a B.Tech CSE Major Project.
 
-- **Institution:** [Your Institution]
-- **Academic Year:** 2025–2026
-- **Team:** [Team Members]
-- **Supervisor:** [Supervisor Name]
+- **Institution:** JECRC UNIVERSITY
+- **Academic Year:** 2026-2027
+- **Team:** AYUSH SINGH
+- **Supervisor:** MRS. SHIPRA KHANDELWAL
 
 ---
 

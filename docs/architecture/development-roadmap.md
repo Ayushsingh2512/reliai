@@ -235,6 +235,7 @@ read metrics and ingest logs/traces.
 - `core/ingestion/metric_scraper.py` — queries Prometheus HTTP API; stores MetricSnapshot
 - `core/ingestion/log_ingestor.py` — receives log batches; writes to Redis buffer
 - `core/ingestion/trace_ingestor.py` — receives trace batches; stores references
+- `core/topology/graph_builder.py` — constructs service dependency graph data model from traces
 - `/ingest/v1/logs` endpoint (API-key authenticated)
 - `/ingest/v1/traces` endpoint (API-key authenticated)
 - Demo services updated to POST logs to ReliAI
@@ -263,7 +264,7 @@ read metrics and ingest logs/traces.
 - `tests/integration/test_observability_pipeline.py` — end-to-end: demo service → ingest → query
 
 **Definition of Done:**
-Metrics queryable via API. Logs queryable via API. Both pipelines visible in integration test.
+Metrics queryable via API. Logs queryable via API. Dependency graph data model constructed. Both pipelines visible in integration test.
 
 ---
 
@@ -333,17 +334,17 @@ Full incident lifecycle (detection → investigation → resolution) completable
 
 ## Phase 7 — AI RCA Pipeline
 
-**Goal:** Implement both RCA modes (RCA_BASELINE and RCA_AI) plus the LLMProvider abstraction.
+**Goal:** Implement all RCA modes (`RCA_BASELINE`, `RCA_AI`, `RCA_AI_NO_EVIDENCE`, `RCA_AI_NO_GRAPH`, `RCA_AGENT`) plus the LLMProvider abstraction.
 The system produces structured, evidence-grounded RCA for every detected incident, with
 the deterministic baseline always available as a fallback and for experimental comparison.
 
 **Components:**
 
-*Shared infrastructure (both modes):*
+*Shared infrastructure (all modes):*
 - `core/ai_pipeline/evidence.py` — EvidenceCollector (shared)
 - `core/ai_pipeline/output_validator.py` — Pydantic schema validation (shared)
 - `core/ai_pipeline/confidence.py` — ConfidenceScorer (shared)
-- `core/ai_pipeline/dispatcher.py` — selects RCA_BASELINE or RCA_AI per request
+- `core/ai_pipeline/dispatcher.py` — selects the appropriate RCA mode per request
 
 *RCA_BASELINE (implement first):*
 - `core/ai_pipeline/rule_rca.py` — 9-rule deterministic engine (no LLM dependency)
@@ -384,8 +385,8 @@ the deterministic baseline always available as a fallback and for experimental c
 - RCA_BASELINE produces valid output for all 8 scenarios (no LLM required)
 - RCA_AI produces valid output with `AI_MOCK_MODE=true` (MockProvider)
 - RCA_AI produces valid output with live GeminiProvider for at least 2 scenarios
-- Both modes record `rca_mode` in `analysis_metadata`
-- Both modes store `RCAOutput` in `ai_analyses` table
+- All modes record `rca_mode` in `analysis_metadata`
+- All modes store `RCAOutput` in `ai_analyses` table
 - `POST /api/v1/remediation/{id}/approve` stores approval with timestamp and user
 
 **Tests:**
@@ -401,7 +402,7 @@ the deterministic baseline always available as a fallback and for experimental c
 
 **Definition of Done:**
 RCA_BASELINE produces correct, evidence-referenced output for all 8 scenarios.
-RCA_AI pipeline end-to-end with MockProvider. Both modes produce identical schema.
+RCA_AI pipeline end-to-end with MockProvider. All modes produce identical schema.
 Remediation approval flow working. All tests pass.
 
 ---
@@ -443,9 +444,9 @@ E2E test passes against local Docker environment.
 
 ---
 
-## Phase 9 — Dependency Graph + Analytics
+## Phase 9 — Topology Visualization & Graph Analytics
 
-**Goal:** Add the service dependency graph visualisation and complete analytics views.
+**Goal:** Add the interactive service topology visualization (React Flow) and complete analytics views.
 
 **Components:**
 - `/dependencies` page with React Flow service graph
@@ -483,8 +484,8 @@ after at least one experiment run.
 - `experiments/` REST API endpoints complete (including `/grade` endpoint)
 - `/experiments` frontend page — experiment management UI
 - Run all **80 detection evaluations** (8 scenarios × 5 reps × 2 detection modes, paired with reset)
-- Run all **80 RCA evaluations** (8 scenarios × 5 reps × 2 RCA modes)
-- Blind human grading of all 80 RCA outputs (mode label hidden during grading)
+- Run all **200 RCA evaluations** (8 scenarios × 5 reps × 5 RCA modes)
+- Blind human grading of all 200 RCA outputs (mode label hidden during grading)
 - `experiments/analysis/results_analysis.py` — compute all metrics defined in `evaluation-plan.md`
 - Export results to CSV
 
@@ -493,21 +494,21 @@ after at least one experiment run.
 2. Environment reset protocol (`runner.py reset`) automated and verified
 3. Batch runner completes 8 scenarios × 1 rep × 2 modes without errors (smoke test)
 4. Full 80-run detection experiment completed (overnight batch)
-5. Full 80-run RCA experiment completed (overnight batch)
-6. Human grading completed for all 80 RCA outputs
+5. Full 200-run RCA experiment completed (overnight batch)
+6. Human grading completed for all 200 RCA outputs
 7. `results_analysis.py` produces all metrics and figures from `evaluation-plan.md`
 
 **Dependencies:** Phase 9
 
 **Deliverables:**
 - 80 detection experiment runs completed and graded
-- 80 RCA experiment runs completed and graded
+- 200 RCA experiment runs completed and graded
 - Results CSV exported with all columns from `evaluation-plan.md` Section 7.1
 - All evaluation metrics computed (DR, MR, FAR, ACR, DL, RCIR, ACA, CC, ERR, RL, E2E-TTD)
 - Figures ready for dissertation Chapter 5
 
 **Definition of Done:**
-All 160 experiment evaluations completed without system errors.
+All 280 experiment evaluations completed without system errors.
 Results exported and metrics computed. Blind grading completed. Reviewer inter-rater
 agreement (Cohen's Kappa) computed for remediation quality scores.
 
@@ -601,9 +602,9 @@ tagged with final version.
 | 4 | Observability Pipeline | 1 week |
 | 5 | Incident Detection | 1.5 weeks |
 | 6 | Incident Management API | 1 week |
-| 7 | AI RCA Pipeline (both modes) | 2 weeks |
+| 7 | AI RCA Pipeline (All Modes) | 2 weeks |
 | 8 | React Dashboard | 2 weeks |
-| 9 | Dependency Graph + Analytics | 1 week |
+| 9 | Topology Visualization & Graph Analytics | 1 week |
 | 10 | Failure Injection + Evaluation | 1.5 weeks |
 | 11 | Testing | 1 week |
 | 12 | Docker / Deployment | 3–4 days |

@@ -14,7 +14,7 @@
 The backend must handle: REST API serving, observability data ingestion, incident detection,
 background AI analysis jobs, and the evaluation framework. A fully microservices backend would
 require service discovery, inter-service networking, and distributed tracing of the backend
-itself — adding significant complexity for a 3-person team.
+itself — adding significant complexity for an individual project.
 
 **Decision:**
 Use a **modular monolith** for the ReliAI backend.
@@ -24,7 +24,7 @@ The codebase is structured into discrete Python packages (`api`, `core`, `ingest
 process. Celery workers run as a separate process but share the same codebase.
 
 **Rationale:**
-- Achievable for a 3-person team within a semester
+- Achievable for an individual project within a semester
 - Each module has clear boundaries and can be explained independently during viva
 - Simpler debugging and local development
 - Celery separation still demonstrates async job processing concepts
@@ -312,27 +312,25 @@ persistent access without a dedicated log storage system.
 
 ---
 
-## ADR-013 — Dual RCA Mode Design: RCA_BASELINE and RCA_AI
+## ADR-013 — Multi-Mode RCA Design: Baseline, LLM, Ablations, and Agentic
 
 **Status:** Accepted
 
 **Context:**
-RQ2 compares LLM-assisted RCA against a deterministic baseline. The baseline must be
-genuine — not artificially weak — for the comparison to have academic validity.
+The evaluation requires comparing LLM-assisted RCA against a deterministic baseline, testing ablations (removing evidence or dependency graph), and exploring agentic tool-calling.
 
 **Decision:**
-Two RCA modes operate on the same `EvidencePackage` input and produce the same `RCAOutput` schema:
+Five RCA modes operate on the `EvidencePackage` (or subsets of it) and produce the same `RCAOutput` schema:
 
-- **`RCA_BASELINE`** (`core/ai_pipeline/rule_rca.py`): 9-rule deterministic engine covering all
-  8 failure scenarios. Rules reference specific metric thresholds and log patterns. Every
-  conclusion cites evidence items from the EvidencePackage. No LLM call.
-- **`RCA_AI`** (`core/ai_pipeline/pipeline.py`): LLMProvider-based analysis. Same EvidencePackage.
-  Same output schema. LLM temperature fixed at 0 for reproducibility.
+- **`RCA_BASELINE`** (`core/ai_pipeline/rule_rca.py`): 9-rule deterministic engine.
+- **`RCA_AI`** (`core/ai_pipeline/pipeline.py`): Standard single-call LLM analysis with full `EvidencePackage`.
+- **`RCA_AI_NO_EVIDENCE`**: Ablation mode, receives only summary.
+- **`RCA_AI_NO_GRAPH`**: Ablation mode, stripped of topological context.
+- **`RCA_AGENT`**: Experimental tool-calling variant bounded by strict constraints (max iterations, timeout, read-only tools).
 
-**Key invariant:** Both modes receive **identical EvidencePackage**. The comparison tests
-reasoning quality, not evidence access.
+**Key invariant for RQ2:** `RCA_BASELINE` and `RCA_AI` receive the **identical full EvidencePackage**. The comparison between them tests reasoning quality, not evidence access. Ablations intentionally modify evidence, and `RCA_AGENT` retrieves evidence dynamically.
 
-**`analysis_metadata.rca_mode`** field (`"RULE_BASED"` | `"LLM_ASSISTED"`) is always recorded
+**`analysis_metadata.rca_mode`** field (`"RCA_BASELINE"` | `"RCA_AI"` | `"RCA_AI_NO_EVIDENCE"` | `"RCA_AI_NO_GRAPH"` | `"RCA_AGENT"`) is always recorded
 for auditability.
 
 **Rationale:**
@@ -400,7 +398,7 @@ Prometheus scrape interval is templated into `prometheus.yml` at compose startup
 | ADR-010 | Docker Compose only, no Kubernetes | ✅ Accepted |
 | ADR-011 | Experiment controller: REST API + CLI wrapper | ✅ Accepted |
 | ADR-012 | Log buffer: Redis 1000 entries/service, no file fallback | ✅ Accepted |
-| ADR-013 | Dual RCA modes: RCA_BASELINE (rules) + RCA_AI (LLM) | ✅ Accepted |
+| ADR-013 | Multi-mode RCA: Baseline, LLM, Ablations, Agent | ✅ Accepted |
 | ADR-014 | All timing intervals configurable via environment variables | ✅ Accepted |
 
 **All decisions are now accepted. No decisions are pending approval.**

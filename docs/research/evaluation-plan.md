@@ -20,9 +20,11 @@ operate on the same `EvidencePackage`?
 deterministic rule-based baseline, and is it operationally acceptable for a local
 demo-scale deployment?
 
-> **Scope note:** These three questions are achievable for a 3-person B.Tech CSE team within
-> a single semester. No additional research questions are added. Depth on these three is
-> preferable to breadth across many.
+**RQ4 (Ablation - Evidence):** Does structured evidence grounding significantly improve RCA accuracy compared to providing only an incident summary to the LLM (`RCA_AI` vs `RCA_AI_NO_EVIDENCE`)?
+
+**RQ5 (Ablation - Graph):** How much does topological context (service dependency graph) contribute to correctly diagnosing cascading failures (`RCA_AI` vs `RCA_AI_NO_GRAPH`)?
+
+**RQ6 (Agentic RCA):** Does an iterative, tool-calling agentic RCA pipeline (`RCA_AGENT`) improve root cause accuracy over single-call inference (`RCA_AI`), and at what cost to latency and reproducibility?
 
 ---
 
@@ -66,15 +68,19 @@ This evaluation crosses two independent variables:
 | `THRESHOLD_ONLY` | Each metric evaluated independently against static thresholds |
 | `HYBRID_CORRELATION` | Threshold violations + Z-score anomaly + service dependency correlation |
 
-**Variable 2 — RCA Mode** (for RQ2 and RQ3):
+**Variable 2 — RCA Mode** (for RQ2, RQ3, RQ4, RQ5, RQ6):
 | Value | Description |
 |---|---|
 | `RCA_BASELINE` | Deterministic rule-based RCA using the same `EvidencePackage` — no LLM |
 | `RCA_AI` | LLM-assisted RCA using the same `EvidencePackage` |
+| `RCA_AI_NO_EVIDENCE` | LLM-assisted RCA with structural evidence grounding removed (receives only incident title/alert summary) |
+| `RCA_AI_NO_GRAPH` | LLM-assisted RCA with dependency graph context removed (receives all other evidence) |
+| `RCA_AGENT` | Tool-calling agentic RCA (iteratively retrieves evidence bounded by constraints) |
 
-> **Critical design principle:** Both RCA modes receive **identical `EvidencePackage` inputs**.
-> The comparison is purely on reasoning quality, not on evidence access.
-> This ensures RQ2 is a fair test of reasoning capability, not evidence availability.
+> **Critical design principle:** `RCA_BASELINE` and `RCA_AI` receive **identical `EvidencePackage` inputs**.
+> The comparison between them is purely on reasoning quality, not on evidence access.
+> Ablations (`RCA_AI_NO_EVIDENCE`, `RCA_AI_NO_GRAPH`) intentionally modify the evidence.
+> `RCA_AGENT` retrieves its own evidence through bounded tools.
 
 ---
 
@@ -195,9 +201,34 @@ Key properties for fair comparison:
 - LLM temperature fixed at 0 for reproducibility
 - Model version recorded in `model_used` field
 
-### 3.3 Shared RCAOutput Schema
+### 3.3 RCA_AI_NO_EVIDENCE — Ablation (No Evidence Grounding)
 
-Both modes produce this schema (defined in `schemas/analysis.py`):
+A strict ablation test for RQ4 to evaluate the contribution of evidence grounding.
+- Receives ONLY the incident title, alert summary, and affected service name.
+- Does NOT receive the detailed `EvidencePackage` (no metrics, logs, traces, or dependency graph).
+- Serves to prove whether the LLM is actually reasoning over evidence or just guessing based on the alert name.
+
+### 3.4 RCA_AI_NO_GRAPH — Ablation (No Topological Context)
+
+A strict ablation test for RQ5 to evaluate the contribution of the dependency graph.
+- Receives the full `EvidencePackage` (metrics, logs, traces) EXCEPT the service dependency graph is explicitly stripped out.
+- Compares directly against `RCA_AI` to measure how much the topological context helps in cascading failure scenarios.
+
+### 3.5 RCA_AGENT — Agentic Tool-Calling RCA (Experimental)
+
+`RCA_AGENT` is an experimental GenAI variant, not a replacement for the controlled single-call `RCA_AI`.
+It evaluates whether iterative, autonomous evidence retrieval improves diagnostic accuracy over providing all evidence upfront.
+
+**Safety & Reproducibility Constraints:**
+- Bounded execution: Configurable maximum tool calls, max iterations, and timeout.
+- Read-only tools: The agent can only inspect metrics, logs, traces, dependency graph, and timeline.
+- No arbitrary code execution.
+- No autonomous remediation.
+- Output is validated against the exact same `RCAOutput` schema.
+
+### 3.6 Shared RCAOutput Schema
+
+All modes produce this schema (defined in `schemas/analysis.py`):
 
 ```jsonc
 {
@@ -219,7 +250,7 @@ Both modes produce this schema (defined in `schemas/analysis.py`):
     { "action": "string", "reason": "string", "expected_impact": "string", "risk": "LOW|MEDIUM|HIGH", "requires_human_approval": true }
   ],
   "analysis_metadata": {
-    "rca_mode": "RULE_BASED | LLM_ASSISTED",
+    "rca_mode": "RCA_BASELINE | RCA_AI | RCA_AI_NO_EVIDENCE | RCA_AI_NO_GRAPH | RCA_AGENT",
     "model_used": "string | null",
     "evidence_count": "int",
     "analysis_duration_ms": "int",
@@ -368,18 +399,17 @@ For each scenario S in {S1..S8}:
       [Collect results]
       [Wait for environment to stabilise]
       
-      Randomise rca_mode_order = shuffle([RCA_BASELINE, RCA_AI])
+      Randomise rca_mode_order = shuffle([RCA_BASELINE, RCA_AI, RCA_AI_NO_EVIDENCE, RCA_AI_NO_GRAPH, RCA_AGENT])
       For each rca_mode in rca_mode_order:
         Trigger RCA on detected incident using rca_mode
         [Collect results]
 ```
 
-This yields: **8 scenarios × 5 reps × 2 detection modes × 2 RCA modes = 160 analysis points**
-(80 detection evaluations + 80 RCA evaluations).
+This yields: **80 detection evaluations** (8 scenarios × 5 reps × 2 detection modes) + **200 RCA evaluations** (8 scenarios × 5 reps × 5 RCA modes) = **280 analysis points**.
 
-> **Practical note:** For a 3-person team, 80 detection runs and 80 RCA evaluations
-> is achievable. RCA_BASELINE is fast (< 1s); RCA_AI adds latency but can run overnight.
-> Human grading of 80 RCA outputs is feasible in 2–3 hours with the rubric.
+> **Practical note:** For an individual project, 80 detection runs and 200 RCA evaluations
+> is achievable. `RCA_BASELINE` is fast (< 1s); LLM modes add latency but can run overnight.
+> Human grading of 200 RCA outputs is feasible within a few days using the rubric.
 
 ### 5.2 Environment Reset Protocol
 

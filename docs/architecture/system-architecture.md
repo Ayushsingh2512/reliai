@@ -190,7 +190,7 @@ reliai/
 │   │   │   │   │   └── mock.py        # MockProvider (offline demo)
 │   │   │   │   ├── output_validator.py# Validates RCA output against schema
 │   │   │   │   ├── confidence.py      # Confidence scoring logic
-│   │   │   │   └── dispatcher.py      # Selects RCA_BASELINE or RCA_AI per request
+│   │   │   │   └── dispatcher.py      # Selects the appropriate RCA mode per request
 │   │   │   │
 │   │   │   └── experiments/
 │   │   │       ├── controller.py      # Experiment lifecycle management
@@ -279,7 +279,7 @@ reliai/
 | `schemas/` | Pydantic input/output contracts | Request/Response schemas |
 | `core/ingestion/` | Pulls metrics from Prometheus; processes incoming logs/traces | MetricScraper, LogIngestor |
 | `core/detection/` | Evaluates rules, correlates signals, creates incidents | DetectionEngine, RuleEvaluator, Correlator |
-| `core/ai_pipeline/` | Dispatches to RCA_BASELINE or RCA_AI; collects evidence; validates output | RCADispatcher, RuleRCA, RCAPipeline |
+| `core/ai_pipeline/` | Dispatches to the selected RCA mode; collects evidence; validates output | RCADispatcher, RuleRCA, RCAPipeline, AgenticRCAPipeline |
 | `core/ai_pipeline/providers/` | LLMProvider abstraction; Gemini, OpenAI-compatible, Mock implementations | LLMProvider (ABC), GeminiProvider, MockProvider |
 | `core/experiments/` | Manages experiment runs, records ground truth and results | ExperimentController |
 | `tasks/` | Celery async task definitions | ai_analysis_task, metric_collection_task |
@@ -320,9 +320,13 @@ to the analysis task (derived from the experiment run config or API request):
 |---|---|---|---|
 | `RCA_BASELINE` | `rule_rca.RuleBasedRCA` | No | Yes |
 | `RCA_AI` | `pipeline.LLMRCAPipeline` | Yes | No (temperature=0) |
-| `RCA_MOCK` | `providers/mock.MockProvider` | No | Yes (offline demo) |
+| `RCA_AI_NO_EVIDENCE` | `pipeline.LLMRCAPipeline` (with evidence stripped) | Yes | No (temperature=0) |
+| `RCA_AI_NO_GRAPH` | `pipeline.LLMRCAPipeline` (with graph stripped) | Yes | No (temperature=0) |
+| `RCA_AGENT` | `pipeline.AgenticRCAPipeline` | Yes | No (experimental tool-calling) |
 
-Both `RCA_BASELINE` and `RCA_AI` receive an identical `EvidencePackage` and produce an
+*Note: `MockProvider` is an offline LLMProvider configuration, not an experimental mode.*
+
+`RCA_BASELINE` and `RCA_AI` receive an identical `EvidencePackage` and all modes produce an
 identical `RCAOutput` schema. The dispatcher records `rca_mode` in `analysis_metadata`.
 
 ### 3.4 AI RCA Pipeline Detail (`RCA_AI` path)
@@ -384,6 +388,16 @@ RCAStore.save(incident_id, rca_output, confidence)
 RemediationStore.save(incident_id, recommendations)
     └── Stores RemediationRecommendation records
 ```
+
+### 3.5 Agentic Tool-Calling Pipeline (`RCA_AGENT` path)
+
+`RCA_AGENT` is an experimental variant intended to evaluate whether iterative, autonomous evidence retrieval improves RCA. It is NOT a replacement for `RCA_AI`.
+
+**Constraints:**
+- Bounded execution with configurable max tool calls, max iterations, and timeout.
+- Bounded read-only tools: can only retrieve predefined observability data (metrics, logs, traces, dependency graph, incident timeline).
+- No arbitrary code execution or autonomous remediation.
+- Output strictly validated against the identical `RCAOutput` schema.
 
 ### 3.4 AI Output JSON Schema
 
@@ -1110,7 +1124,7 @@ postgres + redis → worker, beat
 | | |
 |---|---|
 | **Chosen** | Single FastAPI process, structured into discrete Python packages |
-| **Why** | 3-person team; simpler debugging; each module independently explainable |
+| **Why** | Individual project; simpler debugging; each module independently explainable |
 | **Rejected** | Full microservices backend (service discovery, distributed tracing overhead) |
 | **Trade-off** | Less realistic distributed backend, but demo services are separate — demonstrating distributed systems concepts where it matters |
 
@@ -1127,11 +1141,11 @@ postgres + redis → worker, beat
 
 ---
 
-### V3. Dual RCA Modes: RCA_BASELINE vs RCA_AI
+### V3. Multi-Mode RCA Design
 
 | | |
 |---|---|
-| **Chosen** | Two RCA engines that receive identical `EvidencePackage` and produce identical `RCAOutput` schema |
+| **Chosen** | Multiple RCA engines where `RCA_BASELINE` and `RCA_AI` receive identical full `EvidencePackage` and all produce identical `RCAOutput` schema |
 | **Why** | RQ2 requires a fair comparison; baseline must be genuine, not a strawman |
 | **Rejected** | Using MockProvider as the baseline (too weak); no baseline at all |
 | **Trade-off** | Implementing 9 deterministic rules takes time but produces academically valid results and a system that works without LLM |
