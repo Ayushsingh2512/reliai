@@ -59,6 +59,50 @@ services:
       - backend
     command: npm run dev -- --host 0.0.0.0
 
+  api-gateway:
+    build:
+      context: ./demo-services/api-gateway
+      dockerfile: ../../docker/demo.Dockerfile
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./demo-services/api-gateway:/app
+    environment:
+      - USER_SERVICE_URL=http://user-service:8000
+      - ORDER_SERVICE_URL=http://order-service:8000
+    depends_on:
+      - user-service
+      - order-service
+
+  user-service:
+    build:
+      context: ./demo-services/user-service
+      dockerfile: ../../docker/demo.Dockerfile
+    ports:
+      - "8081:8000"
+    volumes:
+      - ./demo-services/user-service:/app
+    environment:
+      - SERVICE_NAME=user-service
+
+  order-service:
+    build:
+      context: ./demo-services/order-service
+      dockerfile: ../../docker/demo.Dockerfile
+    ports:
+      - "8082:8000"
+    volumes:
+      - ./demo-services/order-service:/app
+    environment:
+      - SERVICE_NAME=order-service
+      - DATABASE_URL=postgresql+asyncpg://reliai:password@postgres:5432/reliai
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
