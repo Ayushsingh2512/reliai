@@ -9,7 +9,18 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.core.security import create_access_token, hash_password
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.main import app
+from app.api.deps import RoleChecker
+from typing import Annotated
+from fastapi import Depends
+
+# Add a test admin route
+@app.get("/api/v1/auth/admin-only")
+async def admin_only(
+    user: Annotated[User, Depends(RoleChecker([UserRole.ADMIN]))]
+) -> dict:
+    return {"message": "Admin access granted"}
 
 # --- REGISTRATION TESTS ---
 
@@ -261,3 +272,59 @@ async def test_full_auth_flow(client: AsyncClient):
     )
     assert me_response.status_code == 200
     assert me_response.json()["email"] == email
+
+# --- RBAC TESTS ---
+
+@pytest.mark.asyncio
+async def test_rbac_active_normal_user_denied(client: AsyncClient, db_session: AsyncSession):
+    email = f"normal_{uuid.uuid4()}@example.com"
+    user = User(email=email, password_hash=hash_password("pw"), role=UserRole.USER.value)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    
+    token = create_access_token(user_id=str(user.id))
+    
+    response = await client.get(
+        "/api/v1/auth/admin-only",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not enough privileges"
+
+@pytest.mark.asyncio
+async def test_rbac_active_admin_user_allowed(client: AsyncClient, db_session: AsyncSession):
+    email = f"admin_{uuid.uuid4()}@example.com"
+    user = User(email=email, password_hash=hash_password("pw"), role=UserRole.ADMIN.value)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    
+    token = create_access_token(user_id=str(user.id))
+    
+    response = await client.get(
+        "/api/v1/auth/admin-only",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    assert response.status_code == 200
+    assert response.json()["message"] == "Admin access granted"
+
+@pytest.mark.asyncio
+async def test_rbac_inactive_admin_user_denied(client: AsyncClient, db_session: AsyncSession):
+    email = f"inactive_admin_{uuid.uuid4()}@example.com"
+    user = User(email=email, password_hash=hash_password("pw"), role=UserRole.ADMIN.value, is_active=False)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    
+    token = create_access_token(user_id=str(user.id))
+    
+    response = await client.get(
+        "/api/v1/auth/admin-only",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Inactive user"

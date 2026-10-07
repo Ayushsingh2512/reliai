@@ -5,10 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_active_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 
@@ -33,7 +33,7 @@ async def register(
     user = User(
         email=email,
         password_hash=hash_password(user_in.password),
-        role="user"
+        role=UserRole.USER.value
     )
     
     db.add(user)
@@ -79,6 +79,6 @@ async def login(
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_user)]
+    current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> User:
     return current_user

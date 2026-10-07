@@ -1,3 +1,4 @@
+import enum
 import uuid
 
 import sqlalchemy as sa
@@ -7,6 +8,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
+
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"
+    ENGINEER = "engineer"
+    VIEWER = "viewer"
+    USER = "user"  # Default role for standard registration
 
 class User(Base):
     __tablename__ = "users"
